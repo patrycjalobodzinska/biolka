@@ -384,13 +384,12 @@ async function sbPhoto(p){if(p.s||p.x||!sbUser||!p.a.startsWith("idb:"))return;c
 async function upPhotos(){for(const id in S.photos)for(const p of S.photos[id])try{await sbPhoto(p)}catch(e){}}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&sbUser&&!writing)sbPull().then(d=>{S=merge(S,d);try{localStorage.setItem("bio61",JSON.stringify(S))}catch(e){}if(!document.body.classList.contains("sess")&&!document.activeElement.matches("textarea,input"))render();loadPhotos()}).catch(()=>{})});
 const sbVal=id=>(document.getElementById(id)||{}).value||"";
-window.sbLogin=async kind=>{if(!sb){sbMsg="Brak połączenia z internetem.";render();return}const email=sbVal("sbe").trim(),password=sbVal("sbp");
+window.sbLogin=async()=>{if(!sb){sbMsg="Brak połączenia z internetem.";render();return}const email=sbVal("sbe").trim(),password=sbVal("sbp");
  if(!email||password.length<6){sbMsg="Podaj e-mail i hasło (min. 6 znaków).";render();return}
  sbBusy=true;sbMsg="";render();
- const r=kind==="up"?await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}}):await sb.auth.signInWithPassword({email,password});
+ const r=await sb.auth.signInWithPassword({email,password});
  sbBusy=false;
  if(r.error)sbMsg=/Invalid login/i.test(r.error.message)?"Zły e-mail albo hasło.":/confirm/i.test(r.error.message)?"Najpierw potwierdź e-mail – kliknij link w wiadomości od Supabase.":r.error.message;
- else if(kind==="up"&&!r.data.session)sbMsg="Konto założone. Kliknij link w mailu od Supabase, potem wróć tu i zaloguj się.";
  render()};
 window.sbOut=async()=>{if(sb)await sb.auth.signOut();sbUser=null;dbRef=null;mode="local";bkClear();render()};
 /* ---------- podręcznik: prywatne treści tylko po zalogowaniu (tabela book + bucket photos/<uid>/book) ---------- */
@@ -440,7 +439,7 @@ function sbPanel(){if(sbUser)return `<section class="panel"><h3>☁️ Synchroni
  <input id="sbe" type="email" autocomplete="email" placeholder="e-mail" style="width:100%;margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:12px;font:inherit;background:var(--bg);color:var(--ink)">
  <input id="sbp" type="password" autocomplete="current-password" placeholder="hasło (min. 6 znaków)" style="width:100%;margin-top:8px;border:1px solid var(--line);border-radius:12px;padding:12px;font:inherit;background:var(--bg);color:var(--ink)">
  ${sbMsg?`<p class="small" style="margin-top:8px">${esc(sbMsg)}</p>`:""}
- <div class="row" style="margin-top:10px"><button class="btn" style="flex:1" data-on="sbLogin('in')"${sbBusy?" disabled":""}>Zaloguj</button><button class="btn ghost" style="flex:1" data-on="sbLogin('up')"${sbBusy?" disabled":""}>Załóż konto</button></div></section>`}
+ <div class="row" style="margin-top:10px"><button class="btn" style="flex:1" data-on="sbLogin()"${sbBusy?" disabled":""}>Zaloguj</button></div></section>`}
 async function connect(){
  sbInit();
  if(!window.claude||!window.claude.use)return;
