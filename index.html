@@ -229,6 +229,7 @@ nav.tabs a[aria-current="page"]{color:var(--accent)}
 <a href="#postepy" data-v="postepy"><svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>Postępy</a>
 <a href="#bledy" data-v="bledy"><svg viewBox="0 0 24 24"><path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/></svg>Błędy<span id="bb"></span></a>
 </div></nav>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="cke/data.js"></script>
 <script>
 const ZR={
@@ -516,7 +517,7 @@ function idb(){if(idbP)return idbP;idbP=new Promise((res,rej)=>{const r=indexedD
 async function idbPut(k,v){const d=await idb();return new Promise((res,rej)=>{const t=d.transaction("ph","readwrite");t.objectStore("ph").put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error)})}
 async function idbGet(k){const d=await idb();return new Promise((res,rej)=>{const t=d.transaction("ph");const q=t.objectStore("ph").get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
 async function idbDel(k){const d=await idb();return new Promise(res=>{const t=d.transaction("ph","readwrite");t.objectStore("ph").delete(k);t.oncomplete=res;t.onerror=res})}
-async function loadPhotos(){if(!IS_PWA)return;for(const id in S.photos)for(const p of S.photos[id])if(p.a.startsWith("idb:")&&!PH[p.a]){try{const b=await idbGet(p.a);if(b)PH[p.a]=URL.createObjectURL(b)}catch(e){}}render()}
+async function loadPhotos(){if(!IS_PWA)return;for(const id in S.photos)for(const p of S.photos[id])if(p.a.startsWith("idb:")&&!PH[p.a]&&!p.x){try{let b=await idbGet(p.a);if(!b&&p.s&&sb){const r=await sb.storage.from("photos").download(p.s);if(r.data){b=r.data;await idbPut(p.a,b)}}if(b)PH[p.a]=URL.createObjectURL(b)}catch(e){}}if(!document.activeElement||!document.activeElement.matches("textarea,input"))render()}
 const phUrl=p=>PH[p.a]||p.u||"";
 const MATURA=new Date(2027,4,10);
 const askOf=z=>noteTxt("ed_"+z.id)||z.ask;
@@ -540,7 +541,7 @@ function norm(d){d=d||{};return {cards:d.cards||{},read:d.read||{},tasks:d.tasks
 function loadLocal(){try{const r=localStorage.getItem("bio61");if(r)S=norm(JSON.parse(r))}catch(e){}}
 function merge(a,b){const o=norm(JSON.parse(JSON.stringify(a)));b=norm(b);
  Object.assign(o.read,b.read);Object.assign(o.answers,b.answers,a.answers||{});
- for(const k in b.photos){const seen=new Set((o.photos[k]||[]).map(p=>p.a));o.photos[k]=(o.photos[k]||[]).concat((b.photos[k]||[]).filter(p=>!seen.has(p.a)))}
+ for(const k in b.photos){const cur=o.photos[k]=o.photos[k]||[];for(const p of b.photos[k]||[]){const q=cur.find(x=>x.a===p.a);if(!q)cur.push(Object.assign({},p));else{if(p.x)q.x=1;if(p.s&&!q.s)q.s=p.s}}}
  for(const k in b.my){const x=o.my[k],y=b.my[k];if(!x||(y.at||0)>(x.at||0))o.my[k]=y}
  for(const k in b.notes){const x=o.notes[k],y=b.notes[k];if(!x||(y.at||0)>(x.at||0))o.notes[k]=y}
  for(const k in b.cards){const x=o.cards[k],y=b.cards[k];if(!x||(y.due||0)>(x.due||0))o.cards[k]=y}
@@ -556,7 +557,41 @@ async function flush(){if(!dbRef)return;if(writing){again=true;return}writing=tr
  writing=false;if(again){again=false;flush()}}
 function save(){try{localStorage.setItem("bio61",JSON.stringify(S))}catch(e){}
  if(dbRef){clearTimeout(saveT);saveT=setTimeout(flush,600)}}
+const SB_URL="https://rbnykhclqqgchirtsrbe.supabase.co",SB_KEY="sb_publishable_iZpQgS-FUHMDGdWFrDyIrA__hhVdEQU";
+let sb=null,sbUser=null,sbMsg="",sbBusy=false;
+async function sbPull(){const {data,error}=await sb.from("progress").select("data").eq("user_id",sbUser.id).maybeSingle();if(error)throw error;return (data&&data.data)||{}}
+async function sbStart(u){sbUser=u;mode="konto";
+ dbRef={set:async()=>{S=merge(S,await sbPull());try{localStorage.setItem("bio61",JSON.stringify(S))}catch(e){}
+  const {error}=await sb.from("progress").upsert({user_id:sbUser.id,data:JSON.parse(JSON.stringify(S)),updated_at:new Date().toISOString()});if(error)throw {code:error.message}}};
+ try{S=merge(S,await sbPull());saveErr=""}catch(e){saveErr=e.message||"błąd"}
+ try{localStorage.setItem("bio61",JSON.stringify(S))}catch(e){}
+ await flush();if(!document.body.classList.contains("sess"))render();upPhotos();loadPhotos()}
+function sbInit(){if(sb||!window.supabase)return;sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:"bio61-auth"}});
+ sb.auth.onAuthStateChange((ev,ses)=>{const u=ses&&ses.user;
+  if(u&&(!sbUser||sbUser.id!==u.id))setTimeout(()=>sbStart(u),0);
+  else if(!u&&sbUser){sbUser=null;dbRef=null;mode="local";render()}})}
+async function sbPhoto(p){if(p.s||p.x||!sbUser||!p.a.startsWith("idb:"))return;const b=await idbGet(p.a);if(!b)return;
+ const path=sbUser.id+"/"+p.a.slice(4)+".jpg";const {error}=await sb.storage.from("photos").upload(path,b,{contentType:"image/jpeg",upsert:true});if(!error){p.s=path;save()}}
+async function upPhotos(){for(const id in S.photos)for(const p of S.photos[id])try{await sbPhoto(p)}catch(e){}}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&sbUser&&!writing)sbPull().then(d=>{S=merge(S,d);try{localStorage.setItem("bio61",JSON.stringify(S))}catch(e){}if(!document.body.classList.contains("sess")&&!document.activeElement.matches("textarea,input"))render();loadPhotos()}).catch(()=>{})});
+const sbVal=id=>(document.getElementById(id)||{}).value||"";
+window.sbLogin=async kind=>{if(!sb){sbMsg="Brak połączenia z internetem.";render();return}const email=sbVal("sbe").trim(),password=sbVal("sbp");
+ if(!email||password.length<6){sbMsg="Podaj e-mail i hasło (min. 6 znaków).";render();return}
+ sbBusy=true;sbMsg="";render();
+ const r=kind==="up"?await sb.auth.signUp({email,password,options:{emailRedirectTo:location.origin+location.pathname}}):await sb.auth.signInWithPassword({email,password});
+ sbBusy=false;
+ if(r.error)sbMsg=/Invalid login/i.test(r.error.message)?"Zły e-mail albo hasło.":/confirm/i.test(r.error.message)?"Najpierw potwierdź e-mail – kliknij link w wiadomości od Supabase.":r.error.message;
+ else if(kind==="up"&&!r.data.session)sbMsg="Konto założone. Kliknij link w mailu od Supabase, potem wróć tu i zaloguj się.";
+ render()};
+window.sbOut=async()=>{if(sb)await sb.auth.signOut();sbUser=null;dbRef=null;mode="local";render()};
+function sbPanel(){if(sbUser)return `<section class="panel"><h3>☁️ Synchronizacja włączona</h3><p class="small muted" style="margin-top:4px">Konto: <b>${esc(sbUser.email||"")}</b>. Postępy, notatki, edycje zadań i zdjęcia zapisują się w chmurze i są takie same na każdym urządzeniu, na którym się zalogujesz.</p>${saveErr?`<p class="small" style="color:var(--bad);margin-top:6px">Ostatni zapis nie doszedł (${esc(saveErr)}). Spróbuję ponownie przy kolejnej zmianie.</p>`:""}<button class="btn block ghost" style="margin-top:10px" data-on="sbOut()">Wyloguj</button></section>`;
+ return `<section class="panel"><h3>☁️ Synchronizacja</h3><p class="small muted" style="margin-top:4px">Zaloguj się, żeby notatki, postępy i zdjęcia były w chmurze – te same na telefonie i komputerze. Obecne dane z tego urządzenia zostaną dołączone do konta.</p>
+ <input id="sbe" type="email" autocomplete="email" placeholder="e-mail" style="width:100%;margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:12px;font:inherit;background:var(--bg);color:var(--ink)">
+ <input id="sbp" type="password" autocomplete="current-password" placeholder="hasło (min. 6 znaków)" style="width:100%;margin-top:8px;border:1px solid var(--line);border-radius:12px;padding:12px;font:inherit;background:var(--bg);color:var(--ink)">
+ ${sbMsg?`<p class="small" style="margin-top:8px">${esc(sbMsg)}</p>`:""}
+ <div class="row" style="margin-top:10px"><button class="btn" style="flex:1" data-on="sbLogin('in')"${sbBusy?" disabled":""}>Zaloguj</button><button class="btn ghost" style="flex:1" data-on="sbLogin('up')"${sbBusy?" disabled":""}>Załóż konto</button></div></section>`}
 async function connect(){
+ sbInit();
  if(!window.claude||!window.claude.use)return;
  try{const [user,db]=await Promise.all([window.claude.use("user"),window.claude.use("db")]);
   if(!user||!db)return;const uid=await user.id();if(!uid)return;
@@ -633,7 +668,7 @@ function vDzis(){
 function overall(){const t=readyT();return t.length?t.reduce((s,x)=>s+mastery(x.id),0)/t.length:0}
 function ring(p,label){return `<div class="ring" style="--p:${Math.round(p*100)}"><span>${label!=null?label:Math.round(p*100)+"%"}</span></div>`}
 
-function dzBtn(did){const n=ZADANIA.filter(z=>dzOf(z)===did&&z.cke).length+Object.values(S.my).filter(m=>m.dz===did).length;return `<a class="btn block ghost" style="margin:8px 0;justify-content:space-between" href="#dz/${did}"><span>📝 Zadania maturalne CKE${n?` (${n})`:""}</span><span>›</span></a>`}
+function dzBtn(did){const n=ZADANIA.filter(z=>dzOf(z)===did&&z.cke).length+Object.values(S.my).filter(m=>m.dz===did&&!m.del).length;return `<a class="btn block ghost" style="margin:8px 0;justify-content:space-between" href="#dz/${did}"><span>📝 Zadania maturalne CKE${n?` (${n})`:""}</span><span>›</span></a>`}
 function vTematy(){
  let h=`<div class="stack"><h1>Tematy</h1><p class="muted">Otwórz temat, żeby czytać notatkę, tabele i ryciny. Kółko pokazuje, ile już umiesz.</p>`;
  for(const d of DZIALY){const f=new Date(d.from+"T00:00"),t=new Date(d.to+"T00:00");
@@ -679,7 +714,7 @@ function vTemat(tid,tab){
 
 let rv=null;
 function vZad(id){
- if(S.my[id])return vMy(id);
+ if(S.my[id]&&!S.my[id].del)return vMy(id);
  const z=ZADANIA.find(x=>x.id===id);if(!z)return vTematy();
  if(z.cke)return vCke(z);
  const t=TEMATY.find(x=>x.id===z.topic),open=rv===id;
@@ -698,19 +733,19 @@ function vZad(id){
 function backFor(z){return z.topic?`t/${z.topic}/zadania`:`dz/${dzOf(z)}`}
 const unH=h=>String(h).replace(/<[^>]+>/g,"").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&");
 const ckImg=(b,mw)=>`<figure class="ckf" data-on="openImg('${b.img}')"><img loading="lazy" src="${b.img}" width="${b.w}" height="${b.h}" style="max-width:${Math.round(b.w/(mw||1.7))}px" alt="Rysunek z arkusza CKE"></figure>`;
-function ckBlocks(bs,key,ed){return (bs||[]).map((b,i)=>{const k=key+i,o=S.notes["ed_"+k],hid=S.notes["hid_"+k];
+function ckBlocks(bs,key,ed){return (bs||[]).map((b,i)=>{const k=key+i,o=noteTxt("ed_"+k),hid=noteTxt("hid_"+k);
  if(ed){if(b.img)return `<div class="cked${hid?" off":""}">${ckImg(b)}<button class="chip" data-on="ckHide('${k}')">${hid?"Pokaż obrazek":"Ukryj obrazek"}</button></div>`;
-  if(b.ans)return "";return `<textarea data-note="ed_${k}" aria-label="Akapit ${i+1}">${esc(o?o.t:unH(b.t))}</textarea>`}
+  if(b.ans)return "";return `<textarea data-note="ed_${k}" aria-label="Akapit ${i+1}">${esc(o||unH(b.t))}</textarea>`}
  if(b.img)return hid?"":ckImg(b);
  if(b.ans)return `<div class="ckans" aria-hidden="true"></div>`;
- if(o)return `<p class="${b.b?"b ":""}mine">${esc(o.t)}</p>`;
+ if(o)return `<p class="${b.b?"b ":""}mine">${esc(o)}</p>`;
  return `<p${b.b?' class="b"':""}>${b.t}</p>`}).join("")}
-const phView=id=>(S.photos[id]||[]).map((p,i)=>`<figure class="ckf" data-on="openImg('${esc(phUrl(p))}')"><img loading="lazy" src="${esc(phUrl(p))}" alt="Moje zdjęcie ${i+1}"></figure>`).join("");
+const phView=id=>(S.photos[id]||[]).filter(p=>!p.x).map((p,i)=>`<figure class="ckf" data-on="openImg('${esc(phUrl(p))}')"><img loading="lazy" src="${esc(phUrl(p))}" alt="Moje zdjęcie ${i+1}"></figure>`).join("");
 function ckQ(z,ed){const t=CKE_T[z.tk];return ckBlocks(t.intro,z.tk+":i",ed)+ckBlocks(z.s.pre,z.id+":p",ed)+ckBlocks(z.s.q,z.id+":q",ed)}
 function ckKey(z){return `${ckBlocks(z.s.key,z.id+":k",false)}${z.s.req.length?`<details style="margin-top:6px"><summary class="small muted" style="cursor:pointer">Wymagania z podstawy programowej</summary><p class="small muted" style="margin-top:6px;white-space:pre-line">${esc(z.s.req.join("\n"))}</p></details>`:""}`}
-window.ckHide=k=>{if(S.notes["hid_"+k])delete S.notes["hid_"+k];else S.notes["hid_"+k]={t:"1",at:Date.now()};save();render()};
+window.ckHide=k=>{S.notes["hid_"+k]={t:noteTxt("hid_"+k)?"":"1",at:Date.now()};save();render()};
 function vCke(z){const sh=SHEET(z.sh),t=CKE_T[z.tk],open=rv===z.id,r=S.tasks[z.id],ed=edOpen===z.id;
- const edited=Object.keys(S.notes).some(k=>/^(ed|hid)_/.test(k)&&(k.includes(z.id+":")||k.includes(z.tk+":i")));
+ const edited=Object.keys(S.notes).some(k=>/^(ed|hid)_/.test(k)&&S.notes[k].t&&(k.includes(z.id+":")||k.includes(z.tk+":i")));
  let h=`<button class="back" data-on="location.hash='${backFor(z)}'">‹ Wróć</button><p class="small muted">${esc(sh.name)} · ${esc(sh.f)} · ${z.max} pkt · ${esc((DZIALY.find(d=>d.id===z.dz)||{}).name||"")}</p><h2>Zadanie ${esc(z.n)}</h2>`;
  if(t.subs.length>1)h+=`<div class="subnav">${t.subs.map(x=>{const id="ck-"+z.sh+"-"+x.n.replace(/\./g,"-"),rr=S.tasks[id];return `<a class="chip${rr?(rr.score===x.max?" ok":" bad"):""}" href="#zad/${id}"${id===z.id?' aria-current="page"':""}>${esc(x.n)}</a>`}).join("")}</div>`;
  h+=`<div class="stack" style="margin-top:14px"><section class="panel"><div class="row between"><p class="small muted">Treść z arkusza${edited?" · z Twoimi zmianami":""}</p><button class="chip" data-on="toggleEd('${z.id}')">${ed?"Gotowe":"✏️ Edytuj"}</button></div>
@@ -734,33 +769,33 @@ function vArk(key){const sh=SHEET(key);if(!sh.key)return vTematy();const list=ZA
 function arkList(){return `<div class="dzh"><h3>Arkusze CKE – formuła 2023</h3></div><p class="small muted" style="margin-bottom:8px">Treść i klucz 1:1 z arkuszy. Każde zadanie jest też przypisane do działu powyżej.</p>`+CKE_SHEETS.map(sh=>{const l=ZADANIA.filter(z=>z.sh===sh.key),d=l.filter(z=>S.tasks[z.id]).length;return `<a class="btn block ghost" style="margin:6px 0;justify-content:space-between" href="#ark/${sh.key}"><span>${esc(sh.name)} <span class="small muted">· ${esc(sh.f)}</span></span><span class="small muted" style="white-space:nowrap">${d}/${l.length} ›</span></a>`}).join("")}
 window.scoreCke=(id,n)=>{const a=$("#ans");if(a){S.answers[id]=a.value}setScore(id,n);rv=null;render();window.scrollTo(0,0)};
 function vDz(did){const d=DZIALY.find(x=>x.id===did);if(!d)return vTematy();
- const list=ZADANIA.filter(z=>dzOf(z)===did),mine=Object.entries(S.my).filter(([k,v])=>v.dz===did);
+ const list=ZADANIA.filter(z=>dzOf(z)===did),mine=Object.entries(S.my).filter(([k,v])=>v.dz===did&&!v.del);
  let h=`<button class="back" data-on="location.hash='tematy'">‹ Tematy</button><p class="small muted">Zadania maturalne z działu</p><h2>${esc(d.name)}</h2><div class="stack" style="margin-top:14px">`;
  h+=`<button class="btn block ghost" data-on="newMy('${did}')">＋ Dodaj własne zadanie (treść, zdjęcie, odpowiedź)</button>`;
- if(mine.length)h+=`<section class="panel"><h3>Moje zadania</h3>${mine.map(([k,v])=>`<a class="wl" style="display:block;text-decoration:none;color:inherit" href="#zad/${k}"><b>${esc(v.title||"Bez tytułu")}</b><p class="small muted">${(S.photos[k]||[]).length} zdj. ${v.q?"· "+esc(v.q.slice(0,60)):""}</p></a>`).join("")}</section>`;
+ if(mine.length)h+=`<section class="panel"><h3>Moje zadania</h3>${mine.map(([k,v])=>`<a class="wl" style="display:block;text-decoration:none;color:inherit" href="#zad/${k}"><b>${esc(v.title||"Bez tytułu")}</b><p class="small muted">${(S.photos[k]||[]).filter(p=>!p.x).length} zdj. ${v.q?"· "+esc(v.q.slice(0,60)):""}</p></a>`).join("")}</section>`;
  const groups={};list.forEach(z=>{const g=z.cke?SHEET(z.sh).name:"Vademecum i inne";(groups[g]=groups[g]||[]).push(z)});
  if(!list.length)h+=`<section class="panel"><p>Zadania CKE z tego działu pojawią się tu po przejrzeniu kolejnych arkuszy.</p></section>`;
  for(const g in groups){const arr=groups[g],pts=arr.reduce((s,z)=>s+z.max,0),got=arr.reduce((s,z)=>s+((S.tasks[z.id]||{}).score||0),0);
   h+=`<details class="panel"${Object.keys(groups).length<3?" open":""}><summary style="cursor:pointer"><span class="row between" style="display:inline-flex;width:calc(100% - 20px)"><b>${esc(g)}</b><span class="chip">${got}/${pts} pkt · ${arr.length} zad.</span></span></summary>${arr.map(z=>{const r=S.tasks[z.id];return `<a class="wl" style="display:block;text-decoration:none;color:inherit" href="#zad/${z.id}"><div class="row between"><b>${z.cke?"Zad. "+esc(z.n):esc(z.src)}</b>${r?`<span class="chip ${r.score===z.max?"ok":"bad"}">${r.score}/${z.max}</span>`:`<span class="chip">${z.max} pkt</span>`}</div><p class="small muted" style="margin-top:2px">${esc(askOf(z).slice(0,110))}${askOf(z).length>110?"…":""}</p></a>`}).join("")}</details>`}
  return h+`</div>`}
 /* ---------- moje materiały: treść + zdjęcia ---------- */
-function myBox(id){const t=noteTxt("tq_"+id),ph=S.photos[id]||[];
+function myBox(id){const t=noteTxt("tq_"+id),ph=(S.photos[id]||[]).filter(p=>!p.x);
  return `<details class="panel"${t||ph.length?" open":""}><summary style="font-weight:700;cursor:pointer;min-height:28px">📷 Moja treść i zdjęcia${ph.length?` (${ph.length})`:""}</summary>
  <p class="small muted" style="margin-top:8px">Wklej albo przepisz treść, dodaj zdjęcie zadania, rysunku czy swojego rozwiązania.</p>
  <textarea data-note="tq_${id}" style="margin-top:8px;min-height:90px" placeholder="Treść zadania / moje rozwiązanie">${esc(t)}</textarea><p class="small muted" id="ns-tq_${id}"></p>
  ${phGrid(id)}</details>${noteBox(id)}`}
 function phGrid(id){const ph=S.photos[id]||[];
- return `<div class="figs" style="margin-top:10px">${ph.map((p,i)=>`<figure class="fig" style="position:relative"><img loading="lazy" src="${esc(phUrl(p))}" alt="Moje zdjęcie ${i+1}" data-on="openImg('${esc(phUrl(p))}')"><figcaption class="row between"><span class="small">Zdjęcie ${i+1}</span><button class="chip ${delPend===id+":"+i?"bad":""}" data-on="delPhoto('${id}',${i})">${delPend===id+":"+i?"Na pewno?":"Usuń"}</button></figcaption></figure>`).join("")}</div>
+ return `<div class="figs" style="margin-top:10px">${ph.map((p,i)=>p.x?"":`<figure class="fig" style="position:relative"><img loading="lazy" src="${esc(phUrl(p))}" alt="Moje zdjęcie ${i+1}" data-on="openImg('${esc(phUrl(p))}')"><figcaption class="row between"><span class="small">Zdjęcie ${i+1}</span><button class="chip ${delPend===id+":"+i?"bad":""}" data-on="delPhoto('${id}',${i})">${delPend===id+":"+i?"Na pewno?":"Usuń"}</button></figcaption></figure>`).join("")}</div>
  <label class="btn block ghost" style="margin-top:10px">＋ Dodaj zdjęcie<input type="file" accept="image/*" data-photo="${id}" style="display:none"></label><p class="small muted" id="pst-${id}"></p>`}
 let delPend=null,assetsNS;
 async function getAssets(){if(assetsNS!==undefined)return assetsNS;try{assetsNS=window.claude&&window.claude.use?await window.claude.use("assets"):null}catch(e){assetsNS=null}return assetsNS}
 async function shrink(file){const bmp=await createImageBitmap(file);const sc=Math.min(1,1800/Math.max(bmp.width,bmp.height));const c=document.createElement("canvas");c.width=Math.round(bmp.width*sc);c.height=Math.round(bmp.height*sc);c.getContext("2d").drawImage(bmp,0,0,c.width,c.height);return await new Promise(r=>c.toBlob(r,"image/jpeg",0.82))}
 document.addEventListener("change",async e=>{const el=e.target.closest("[data-photo]");if(!el||!el.files||!el.files[0])return;const id=el.getAttribute("data-photo"),st=document.getElementById("pst-"+id);
- if(IS_PWA){try{if(st)st.textContent="Zapisuję zdjęcie…";const blob=await shrink(el.files[0]);const k="idb:"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);await idbPut(k,blob);PH[k]=URL.createObjectURL(blob);(S.photos[id]=S.photos[id]||[]).push({a:k,u:"",at:Date.now()});save();render()}catch(err){if(st)st.textContent="Nie udało się zapisać zdjęcia."}return}
+ if(IS_PWA){try{if(st)st.textContent="Zapisuję zdjęcie…";const blob=await shrink(el.files[0]);const k="idb:"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);await idbPut(k,blob);PH[k]=URL.createObjectURL(blob);const np={a:k,u:"",at:Date.now()};(S.photos[id]=S.photos[id]||[]).push(np);save();render();sbPhoto(np).catch(()=>{})}catch(err){if(st)st.textContent="Nie udało się zapisać zdjęcia."}return}
  const as=await getAssets();if(!as){if(st)st.textContent="Zdjęcia można dodawać po otwarciu aplikacji na swoim koncie Claude.";return}
  try{if(st)st.textContent="Wysyłam zdjęcie…";const blob=await shrink(el.files[0]);const r=await as.upload(blob);(S.photos[id]=S.photos[id]||[]).push({a:r.id,u:r.url,at:Date.now()});save();render()}
  catch(err){if(st)st.textContent="Nie udało się dodać zdjęcia ("+((err&&err.code)||"błąd")+").";}});
-window.delPhoto=async(id,i)=>{const k=id+":"+i;if(delPend!==k){delPend=k;render();return}delPend=null;const p=(S.photos[id]||[])[i];if(!p)return;S.photos[id].splice(i,1);save();render();if(p.a.startsWith("idb:")){idbDel(p.a);return}const as=await getAssets();if(as)try{await as.delete(p.a)}catch(e){}};
+window.delPhoto=async(id,i)=>{const k=id+":"+i;if(delPend!==k){delPend=k;render();return}delPend=null;const p=(S.photos[id]||[])[i];if(!p)return;p.x=1;p.at=Date.now();save();render();if(p.s&&sb)sb.storage.from("photos").remove([p.s]).catch(()=>{});if(p.a.startsWith("idb:")){idbDel(p.a);return}const as=await getAssets();if(as)try{await as.delete(p.a)}catch(e){}};
 window.newMy=did=>{const id="my-"+Date.now().toString(36);S.my[id]={dz:did,title:"",q:"",ans:"",at:Date.now()};save();location.hash="zad/"+id};
 function vMy(id){const m=S.my[id],d=DZIALY.find(x=>x.id===m.dz)||{};
  return `<button class="back" data-on="location.hash='dz/${m.dz}'">‹ ${esc(d.name||"Wróć")}</button><p class="small muted">Moje zadanie</p><div class="stack" style="margin-top:10px">
@@ -771,7 +806,7 @@ function vMy(id){const m=S.my[id],d=DZIALY.find(x=>x.id===m.dz)||{};
  <button class="btn block ghost" data-on="delMy('${id}')">${delPend==="my:"+id?"Na pewno usunąć?":"Usuń zadanie"}</button></div>`}
 let myTm=null;
 document.addEventListener("input",e=>{const el=e.target.closest("[data-my]");if(!el)return;const [id,f]=el.getAttribute("data-my").split(":");if(!S.my[id])return;S.my[id][f]=el.value;S.my[id].at=Date.now();clearTimeout(myTm);myTm=setTimeout(()=>{save();const s=document.getElementById("mys-"+id);if(s)s.textContent="Zapisano."},500)});
-window.delMy=id=>{if(delPend!=="my:"+id){delPend="my:"+id;render();return}delPend=null;const dz=S.my[id].dz;delete S.my[id];delete S.photos[id];save();location.hash="dz/"+dz};
+window.delMy=id=>{if(delPend!=="my:"+id){delPend="my:"+id;render();return}delPend=null;const dz=S.my[id].dz;S.my[id]={dz,del:1,at:Date.now()};(S.photos[id]||[]).forEach(p=>{p.x=1;p.at=Date.now()});save();location.hash="dz/"+dz};
 window.reveal=id=>{const a=$("#ans");if(a){S.answers[id]=a.value;save()}rv=id;render()};
 function setScore(id,score){const z=ZADANIA.find(x=>x.id===id);S.tasks[id]={score,max:z.max,at:Date.now()};
  if(score<z.max)S.errors[id]={due:dayNum()+3};else delete S.errors[id];logAns(score===z.max);save()}
@@ -791,8 +826,9 @@ function vPostepy(){
  <section class="panel"><h3>Tematy</h3>`;
  for(const t of readyT()){const m=mastery(t.id);h+=`<a href="#t/${t.id}/notatka" style="display:block;text-decoration:none;color:inherit;padding:10px 0;border-top:1px solid var(--line)"><div class="row between"><span>${esc(t.name)}</span><b>${Math.round(m*100)}%</b></div><div class="meter" style="margin-top:6px"><i style="width:${m*100}%"></i></div></a>`}
  h+=`</section>`;
+ h+=sbPanel();
  if(IS_PWA){let le=0;try{le=Number(localStorage.getItem("bio61exp"))||0}catch(e){}const ago=le?Math.floor((Date.now()-le)/864e5):null;
-  h+=`<section class="panel"><h3>Kopia zapasowa</h3><p class="small muted" style="margin-top:4px">Wszystko (postępy, notatki, zdjęcia, własne zadania) jest zapisane tylko na tym telefonie. Rób kopię co tydzień i trzymaj ją np. na Dysku Google lub w iCloud.</p>
+  h+=`<section class="panel"><h3>Kopia zapasowa</h3><p class="small muted" style="margin-top:4px">${sbUser?"Dane są w chmurze, ale kopia w pliku nie zaszkodzi.":"Bez logowania wszystko (postępy, notatki, zdjęcia, własne zadania) jest zapisane tylko na tym urządzeniu. Rób kopię co tydzień i trzymaj ją np. na Dysku Google lub w iCloud."}</p>
   <p class="small" style="margin-top:8px;${ago==null||ago>7?"color:var(--bad);font-weight:700":""}">${ago==null?"Nie masz jeszcze żadnej kopii.":"Ostatnia kopia: "+(ago===0?"dziś":ago+" dni temu")+"."}</p>
   <button class="btn block" style="margin-top:10px" data-on="exportData()">Zapisz kopię (eksport)</button>
   <label class="btn block ghost" style="margin-top:8px">Wczytaj kopię (import)<input type="file" accept="application/json,.json" data-import="1" style="display:none"></label><p class="small muted" id="bkst"></p></section>`}
@@ -951,7 +987,7 @@ const noteTxt=id=>(S.notes[id]&&S.notes[id].t)||"";
 function noteBox(id){const t=noteTxt(id);return `<details class="panel" ${t?"open":""}><summary style="font-weight:700;cursor:pointer;min-height:28px">📝 Moja notatka${t?"":" – dodaj"}</summary><textarea data-note="${id}" style="margin-top:10px;min-height:110px" placeholder="Np. na czym się pomyliłam, co zapamiętać, skrót do kartki przed maturą">${esc(t)}</textarea><p class="small muted" id="ns-${id}">${t?"Zapisano.":"Zapisuje się automatycznie."}</p></details>`}
 let noteT=null;
 document.addEventListener("input",e=>{const el=e.target.closest("[data-note]");if(!el)return;const id=el.getAttribute("data-note");
- S.notes[id]={t:el.value,at:Date.now()};if(!el.value.trim())delete S.notes[id];const s=document.getElementById("ns-"+id);if(s)s.textContent="Zapisywanie…";
+ S.notes[id]={t:el.value.trim()?el.value:"",at:Date.now()};const s=document.getElementById("ns-"+id);if(s)s.textContent="Zapisywanie…";
  clearTimeout(noteT);noteT=setTimeout(()=>{save();const s2=document.getElementById("ns-"+id);if(s2)s2.textContent="Zapisano."},500)});
 
 /* ---------- film YouTube (PowelToJa) ---------- */
@@ -969,7 +1005,7 @@ const ytBtn=(c,cls)=>`<a class="btn ${cls||"ghost"}" data-vid="${c.s},${c.e}" hr
 const parseT=v=>{const p=String(v).trim().split(":").map(Number);if(!p.length||p.some(isNaN))return null;let s=0;for(const x of p)s=s*60+x;return s};
 const myT=tid=>{const n=S.notes["vid_"+tid];return n&&n.t?parseT(n.t):null};
 window.setVid=tid=>{const el=document.getElementById("vt-"+tid);const v=el.value.trim();if(v&&parseT(v)==null){el.style.borderColor="var(--bad)";return}
- if(v)S.notes["vid_"+tid]={t:v,at:Date.now()};else delete S.notes["vid_"+tid];save();render()};
+ S.notes["vid_"+tid]={t:v,at:Date.now()};save();render()};
 function vidPanel(tid,did){const ch=chOf(did),m=myT(tid),raw=(S.notes["vid_"+tid]||{}).t||"";
  return `<details class="panel"${m!=null?" open":""}><summary style="font-weight:700;cursor:pointer;min-height:28px">Film: wielka powtórka (PowelToJa)</summary><div class="stack" style="margin-top:10px">
  ${m!=null?`<a class="btn block" data-vid="${m}" href="${yt(m)}">▶ Ten temat – od ${hms(m)}</a>`:""}
