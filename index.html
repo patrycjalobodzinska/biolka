@@ -195,12 +195,21 @@ nav.tabs a[aria-current="page"]{color:var(--accent)}
 #lb .sc{flex:1;overflow:auto;display:flex;align-items:center;justify-content:center}
 #lb img{max-width:100%;max-height:100%}
 #lb.zoom .sc{display:block}#lb.zoom img{max-width:none;max-height:none;width:220%}
+/* film */
+#vb{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:50;display:none;flex-direction:column}
+#vb.on{display:flex}
+#vb .bar{display:flex;gap:8px;align-items:center;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 10px;color:#fff}
+#vb .bar span{flex:1;font-size:.85rem}
+#vb .bar a,#vb .bar button{background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:700;min-height:44px;font:inherit;font-size:.85rem;text-decoration:none;display:flex;align-items:center}
+#vb .sc{flex:1;display:flex;align-items:center;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px)}
+#vb iframe{width:100%;max-width:1100px;aspect-ratio:16/9;max-height:100%;border:0;background:#000}
 .status{font-size:.78rem;text-align:center}
 </style>
 </head>
 <body>
 <main id="app" aria-live="polite"></main>
 <div id="lb" role="dialog" aria-modal="true" aria-label="Podgląd ryciny"><div class="bar"><span id="lbc"></span><button data-on="zoomImg()">Powiększ</button><button data-on="closeImg()">Zamknij</button></div><div class="sc" data-on="zoomImg()"><img id="lbi" alt=""></div></div>
+<div id="vb" role="dialog" aria-modal="true" aria-label="Film"><div class="bar"><span id="vbc"></span><a id="vbo" target="_blank" rel="noopener">YouTube ↗</a><button data-on="closeVid()">Zamknij</button></div><div class="sc"><iframe id="vbi" title="Film" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div></div>
 <nav class="tabs" aria-label="Nawigacja"><div class="in">
 <a href="#dzis" data-v="dzis"><svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.5 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/></svg>Dziś</a>
 <a href="#tematy" data-v="tematy"><svg viewBox="0 0 24 24"><path d="M4 5h6a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4zM20 5h-6a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h6z"/></svg>Tematy</a>
@@ -615,8 +624,8 @@ function vTematy(){
  let h=`<div class="stack"><h1>Tematy</h1><p class="muted">Otwórz temat, żeby czytać notatkę, tabele i ryciny. Kółko pokazuje, ile już umiesz.</p>`;
  for(const d of DZIALY){const f=new Date(d.from+"T00:00"),t=new Date(d.to+"T00:00");
   const when=f.getDate()+"."+String(f.getMonth()+1).padStart(2,"0")+"–"+t.getDate()+"."+String(t.getMonth()+1).padStart(2,"0");
-  if(!d.ready){h+=`<div class="locked row between"><span><b>${esc(d.name)}</b><br><span class="small muted">Treści pojawią się przed startem działu</span></span><span class="small muted">${when}</span></div>${dzBtn(d.id)}${chOf(d.id).length?`<div style="margin:8px 0 4px">${chOf(d.id).map(c=>`<a class="chip" style="margin:0 6px 6px 0;text-decoration:none" target="_blank" rel="noopener" href="${yt(c.s)}">▶ ${esc(c.n)} · ${hms(c.s)}</a>`).join("")}</div>`:""}`;continue}
-  h+=`<div class="dzh"><h3>${esc(d.name)}</h3><span class="small muted">${when}</span></div><a class="btn block ghost" style="margin-bottom:8px;justify-content:space-between" href="#quiz/${d.id}"><span>🎯 Quiz z całego działu</span><span>›</span></a>${dzBtn(d.id)}`+chOf(d.id).map(c=>`<a class="chip" style="margin:0 6px 8px 0;text-decoration:none" target="_blank" rel="noopener" href="${yt(c.s)}">▶ ${esc(c.n)} · ${hms(c.s)}</a>`).join("");
+  if(!d.ready){h+=`<div class="locked row between"><span><b>${esc(d.name)}</b><br><span class="small muted">Treści pojawią się przed startem działu</span></span><span class="small muted">${when}</span></div>${dzBtn(d.id)}${chOf(d.id).length?`<div style="margin:8px 0 4px">${chOf(d.id).map(c=>`<a class="chip" style="margin:0 6px 6px 0;text-decoration:none" data-vid="${c.s},${c.e}" href="${yt(c.s)}">▶ ${esc(c.n)} · ${hms(c.s)}</a>`).join("")}</div>`:""}`;continue}
+  h+=`<div class="dzh"><h3>${esc(d.name)}</h3><span class="small muted">${when}</span></div><a class="btn block ghost" style="margin-bottom:8px;justify-content:space-between" href="#quiz/${d.id}"><span>🎯 Quiz z całego działu</span><span>›</span></a>${dzBtn(d.id)}`+chOf(d.id).map(c=>`<a class="chip" style="margin:0 6px 8px 0;text-decoration:none" data-vid="${c.s},${c.e}" href="${yt(c.s)}">▶ ${esc(c.n)} · ${hms(c.s)}</a>`).join("");
   for(const tp of TEMATY.filter(x=>x.dzial===d.id)){const m=mastery(tp.id),n=FISZKI[tp.id].length;
    h+=`<a class="tcard" href="#t/${tp.id}/notatka">${ring(m)}<div class="tx"><h3>${esc(tp.name)}</h3><p class="small muted">${S.read[tp.id]?`${known(tp.id)}/${n} fiszek opanowanych`:`${n} fiszek · ${(QUIZ[tp.id]||[]).length} pytań · ${topicTasks(tp.id).length} zadań`}</p></div><span aria-hidden="true">›</span></a>`}}
  return h+`</div>`}
@@ -913,15 +922,19 @@ const CH=[["Chemizm życia",0,"d1"],["Komórka",3345,"d2"],["Metabolizm",5786,"d
 const VEND=34392;
 const hms=s=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return (h?h+":"+String(m).padStart(2,"0"):m)+":"+String(x).padStart(2,"0")};
 const yt=s=>`https://youtu.be/${VID}?t=${s}`;
+const ytE=(s,e)=>`https://www.youtube.com/embed/${VID}?autoplay=1&playsinline=1&rel=0&start=${s}${e?"&end="+e:""}`;
+window.openVid=(s,e)=>{const c=CH.slice().reverse().find(x=>x[1]<=s);$("#vbc").textContent=(c?c[0]+" · ":"")+"od "+hms(s);$("#vbo").href=yt(s);$("#vbi").src=ytE(s,e);$("#vb").classList.add("on");document.body.style.overflow="hidden"};
+window.closeVid=()=>{if(!$("#vb").classList.contains("on"))return;$("#vb").classList.remove("on");$("#vbi").removeAttribute("src");document.body.style.overflow=""};
+document.addEventListener("click",e=>{const a=e.target.closest("a[data-vid]");if(!a)return;e.preventDefault();const [s,en]=a.dataset.vid.split(",").map(Number);openVid(s,en)});
 const chOf=did=>CH.map((c,i)=>({n:c[0],s:c[1],e:(CH[i+1]||[0,VEND])[1],d:c[2]})).filter(c=>c.d===did);
-const ytBtn=(c,cls)=>`<a class="btn ${cls||"ghost"}" target="_blank" rel="noopener" href="${yt(c.s)}" style="justify-content:flex-start;text-align:left"><span>▶</span><span style="flex:1">${esc(c.n)}<br><span class="small muted" style="font-weight:500">od ${hms(c.s)} · ok. ${Math.round((c.e-c.s)/60)} min</span></span></a>`;
+const ytBtn=(c,cls)=>`<a class="btn ${cls||"ghost"}" data-vid="${c.s},${c.e}" href="${yt(c.s)}" style="justify-content:flex-start;text-align:left"><span>▶</span><span style="flex:1">${esc(c.n)}<br><span class="small muted" style="font-weight:500">od ${hms(c.s)} · ok. ${Math.round((c.e-c.s)/60)} min</span></span></a>`;
 const parseT=v=>{const p=String(v).trim().split(":").map(Number);if(!p.length||p.some(isNaN))return null;let s=0;for(const x of p)s=s*60+x;return s};
 const myT=tid=>{const n=S.notes["vid_"+tid];return n&&n.t?parseT(n.t):null};
 window.setVid=tid=>{const el=document.getElementById("vt-"+tid);const v=el.value.trim();if(v&&parseT(v)==null){el.style.borderColor="var(--bad)";return}
  if(v)S.notes["vid_"+tid]={t:v,at:Date.now()};else delete S.notes["vid_"+tid];save();render()};
 function vidPanel(tid,did){const ch=chOf(did),m=myT(tid),raw=(S.notes["vid_"+tid]||{}).t||"";
  return `<details class="panel"${m!=null?" open":""}><summary style="font-weight:700;cursor:pointer;min-height:28px">Film: wielka powtórka (PowelToJa)</summary><div class="stack" style="margin-top:10px">
- ${m!=null?`<a class="btn block" target="_blank" rel="noopener" href="${yt(m)}">▶ Ten temat – od ${hms(m)}</a>`:""}
+ ${m!=null?`<a class="btn block" data-vid="${m}" href="${yt(m)}">▶ Ten temat – od ${hms(m)}</a>`:""}
  ${ch.length?ch.map(c=>ytBtn(c)).join(""):`<p class="small muted">W filmie nie ma osobnego rozdziału dla tego działu.</p>`}
  <div><p class="small muted">Twoja minuta dla tego tematu (np. 23:10 albo 1:05:30)</p><div class="row" style="margin-top:6px;flex-wrap:nowrap"><input id="vt-${tid}" inputmode="numeric" value="${esc(raw)}" placeholder="mm:ss" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:12px;padding:12px;font:inherit;background:var(--bg);color:var(--ink);min-height:50px"><button class="btn" data-on="setVid('${tid}')">Zapisz</button></div></div></div></details>`}
 
@@ -942,11 +955,11 @@ function render(){
  document.querySelectorAll("nav.tabs a").forEach(a=>{if(a.dataset.v===v)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
  const e=errCount();$("#bb").innerHTML=e?`<span class="badge">${e}</span>`:"";
 }
-window.addEventListener("hashchange",()=>{if(!location.hash.startsWith("#zad/"))rv=null;if(!location.hash.startsWith("#sesja"))window.scrollTo(0,0);render()});
+window.addEventListener("hashchange",()=>{closeVid();if(!location.hash.startsWith("#zad/"))rv=null;if(!location.hash.startsWith("#sesja"))window.scrollTo(0,0);render()});
 document.addEventListener("click",e=>{const el=e.target.closest("[data-on]");if(!el||el.disabled)return;const c=el.getAttribute("data-on");let m;
  if((m=c.match(/^location\.hash='(.*)'$/))){location.hash=m[1];return}
  if((m=c.match(/^(\w+)\((.*)\)$/))){const args=m[2]?m[2].split(",").map(x=>{x=x.trim();return /^'.*'$/.test(x)?x.slice(1,-1):Number(x)}):[];const f=window[m[1]];if(typeof f==="function")f(...args)}});
-document.addEventListener("keydown",e=>{if(e.key==="Escape")closeImg();
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeImg();closeVid()}
  if(!sess||sess.done||!location.hash.startsWith("#sesja"))return;const it=sess.items[sess.i];if(!it)return;
  if(it.k==="card"){if(!it.show&&(e.key===" "||e.key==="Enter")){e.preventDefault();flipC()}else if(it.show&&["1","2","3"].includes(e.key))gradeC(Number(e.key)-1)}
  else if(it.k==="quiz"&&it.opts&&it.chosen==null&&/^[1-4]$/.test(e.key)&&it.opts[e.key-1])ans(Number(e.key)-1)
