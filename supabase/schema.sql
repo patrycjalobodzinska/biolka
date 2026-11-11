@@ -33,3 +33,23 @@ create policy "own photos update" on storage.objects for update to authenticated
   using (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "own photos delete" on storage.objects for delete to authenticated
   using (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- prywatne materiały z podręcznika (przepisane strony); widzi je tylko właściciel konta
+create table if not exists public.book (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  id text not null,
+  data jsonb not null,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, id)
+);
+
+alter table public.book enable row level security;
+
+drop policy if exists "own book select" on public.book;
+drop policy if exists "own book insert" on public.book;
+drop policy if exists "own book update" on public.book;
+drop policy if exists "own book delete" on public.book;
+create policy "own book select" on public.book for select to authenticated using (auth.uid() = user_id);
+create policy "own book insert" on public.book for insert to authenticated with check (auth.uid() = user_id);
+create policy "own book update" on public.book for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own book delete" on public.book for delete to authenticated using (auth.uid() = user_id);

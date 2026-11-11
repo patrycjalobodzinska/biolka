@@ -132,6 +132,23 @@ a.src{text-decoration:underline;text-decoration-color:var(--line)}
 .ck textarea{min-height:90px;margin-bottom:8px;font-family:var(--serif)}
 .cked{border:1px dashed var(--line);border-radius:10px;padding:8px;margin-bottom:8px}
 .cked.off img{opacity:.3}
+.bk{font-family:var(--serif);font-size:1.02rem;line-height:1.5}
+.bk h3{margin:18px 0 6px}.bk h4{margin:16px 0 8px;display:inline-block;background:var(--accent);color:#fff;padding:3px 10px;border-radius:6px;font-size:1rem}
+.bk h5{font-family:var(--sans,inherit);font-size:.92rem;margin:12px 0 4px;letter-spacing:.01em}
+.bk p{margin:6px 0}.bk ul,.bk ol{margin:6px 0;padding-left:1.3em}.bk li{margin:2px 0}
+.bk .def{background:color-mix(in srgb,var(--gold,#e0b84a) 18%,transparent);border-radius:8px;padding:8px 10px}
+.bk .ex{font-style:italic;color:var(--muted);border-left:3px solid var(--line);padding-left:8px}
+.bk .tag{display:inline-block;font-size:.75rem;font-weight:700;background:var(--ink);color:var(--bg);padding:2px 8px;border-radius:6px}
+.bk .ref,.bk .note{font-size:.85rem;color:var(--muted)}
+.bk .map{margin:10px 0}.bk .maph{text-align:center;font-weight:700;font-size:.85rem;background:var(--accent);color:#fff;border-radius:8px;padding:4px 8px;margin:0 auto 8px;max-width:fit-content}
+.bk .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.bk .box{border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--surface)}
+.bk .tw{overflow-x:auto;margin:8px 0}.bk table{border-collapse:collapse;font-size:.9rem;min-width:100%}
+.bk th,.bk td{border:1px solid var(--line);padding:5px 7px;vertical-align:top;text-align:left}.bk th{background:var(--sunk)}
+.bk .pg{font-family:var(--sans,inherit);font-size:.75rem;color:var(--muted);margin-top:18px;border-top:1px solid var(--line);padding-top:6px}
+.bk figure{margin:8px 0 12px;cursor:zoom-in}.bk figure img{max-width:100%;height:auto;border-radius:8px;background:var(--sunk)}
+.bk figcaption{font-size:.8rem;color:var(--muted);margin-top:3px}
+.bk textarea{font-family:ui-monospace,monospace;font-size:.8rem;min-height:110px}
 .subnav{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-top:10px}
 .subnav a{flex:none;text-decoration:none}
 .subnav a[aria-current]{background:var(--accent);color:var(--accent-ink)}
@@ -565,11 +582,11 @@ async function sbStart(u){sbUser=u;mode="konto";
   const {error}=await sb.from("progress").upsert({user_id:sbUser.id,data:JSON.parse(JSON.stringify(S)),updated_at:new Date().toISOString()});if(error)throw {code:error.message}}};
  try{S=merge(S,await sbPull());saveErr=""}catch(e){saveErr=e.message||"błąd"}
  try{localStorage.setItem("bio61",JSON.stringify(S))}catch(e){}
- await flush();if(!document.body.classList.contains("sess"))render();upPhotos();loadPhotos()}
+ await flush();if(!document.body.classList.contains("sess"))render();upPhotos();loadPhotos();loadBook()}
 function sbInit(){if(sb||!window.supabase)return;sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:"bio61-auth"}});
  sb.auth.onAuthStateChange((ev,ses)=>{const u=ses&&ses.user;
   if(u&&(!sbUser||sbUser.id!==u.id))setTimeout(()=>sbStart(u),0);
-  else if(!u&&sbUser){sbUser=null;dbRef=null;mode="local";render()}})}
+  else if(!u&&sbUser){sbUser=null;dbRef=null;mode="local";bkClear();render()}})}
 async function sbPhoto(p){if(p.s||p.x||!sbUser||!p.a.startsWith("idb:"))return;const b=await idbGet(p.a);if(!b)return;
  const path=sbUser.id+"/"+p.a.slice(4)+".jpg";const {error}=await sb.storage.from("photos").upload(path,b,{contentType:"image/jpeg",upsert:true});if(!error){p.s=path;save()}}
 async function upPhotos(){for(const id in S.photos)for(const p of S.photos[id])try{await sbPhoto(p)}catch(e){}}
@@ -583,7 +600,48 @@ window.sbLogin=async kind=>{if(!sb){sbMsg="Brak połączenia z internetem.";rend
  if(r.error)sbMsg=/Invalid login/i.test(r.error.message)?"Zły e-mail albo hasło.":/confirm/i.test(r.error.message)?"Najpierw potwierdź e-mail – kliknij link w wiadomości od Supabase.":r.error.message;
  else if(kind==="up"&&!r.data.session)sbMsg="Konto założone. Kliknij link w mailu od Supabase, potem wróć tu i zaloguj się.";
  render()};
-window.sbOut=async()=>{if(sb)await sb.auth.signOut();sbUser=null;dbRef=null;mode="local";render()};
+window.sbOut=async()=>{if(sb)await sb.auth.signOut();sbUser=null;dbRef=null;mode="local";bkClear();render()};
+/* ---------- podręcznik: prywatne treści tylko po zalogowaniu (tabela book + bucket photos/<uid>/book) ---------- */
+let BOOK={},bookMsg="",bookBusy=false;const BKU={},bkLoading=new Set();
+async function idbDelPrefix(pre){const d=await idb();return new Promise(res=>{const t=d.transaction("ph","readwrite"),st=t.objectStore("ph"),q=st.openCursor();
+ q.onsuccess=()=>{const c=q.result;if(!c)return;if(String(c.key).startsWith(pre))c.delete();c.continue()};t.oncomplete=res;t.onerror=res})}
+async function bkClear(){BOOK={};for(const k in BKU){URL.revokeObjectURL(BKU[k]);delete BKU[k]}try{await idbDelPrefix("bk:")}catch(e){}}
+async function loadBook(){if(!sbUser)return;
+ try{const c=await idbGet("bk:data:"+sbUser.id);if(c&&!Object.keys(BOOK).length){BOOK=c;render()}}catch(e){}
+ try{const {data,error}=await sb.from("book").select("id,data");if(error)throw error;const b={};for(const r of data)b[r.id]=r.data;BOOK=b;
+  await idbPut("bk:data:"+sbUser.id,b);if(!document.body.classList.contains("sess")&&!document.activeElement.matches("textarea,input"))render()}catch(e){}}
+async function bkFetch(n){if(bkLoading.has(n)||!sbUser)return;bkLoading.add(n);
+ try{let b=await idbGet("bk:img:"+n);if(!b){const r=await sb.storage.from("photos").download(sbUser.id+"/book/"+n);if(r.data){b=r.data;await idbPut("bk:img:"+n,b)}}
+  if(b){BKU[n]=URL.createObjectURL(b);document.querySelectorAll(`img[data-bk="${n}"]`).forEach(el=>{el.src=BKU[n];el.closest("figure").dataset.on=`openImg('${BKU[n]}')`})}}catch(e){}
+ bkLoading.delete(n)}
+function bkFig(b,cap){const u=BKU[b.img];if(u)BKCAP[u]=cap;else setTimeout(()=>bkFetch(b.img),0);
+ return `<figure data-on="openImg('${u||""}')"><img loading="lazy" data-bk="${esc(b.img)}" ${u?`src="${u}"`:""} width="${b.w}" height="${b.h}" style="max-width:min(100%,${Math.round(b.w/1.6)}px)" alt="${esc(cap||"Rysunek z podręcznika")}">${cap?`<figcaption>${esc(cap)}</figcaption>`:""}</figure>`}
+const bkWrap=h=>h.replace(/<table/g,'<div class="tw"><table').replace(/<\/table>/g,"</table></div>");
+function bookH(tid,ed){const B=BOOK[tid];if(!B)return "";let h=`<div class="bk">`;
+ B.pages.forEach((pg,pi)=>{h+=`<p class="pg">Vademecum, s. ${pg.page}</p>`;
+  pg.blocks.forEach((b,i)=>{const k="bk_"+tid+"_"+pi+"_"+i,o=noteTxt("ed_"+k),hid=noteTxt("hid_"+k),cap=b.cap?b.cap+" · s. "+pg.page:"s. "+pg.page;
+   if(b.img){if(ed)h+=`<div class="cked${hid?" off":""}">${bkFig(b,cap)}<button class="chip" data-on="ckHide('${k}')">${hid?"Pokaż rysunek":"Ukryj rysunek"}</button></div>`;else if(!hid)h+=bkFig(b,cap);return}
+   const src=b.h?`<h3>${esc(b.h)}</h3>`:b.h4?`<h4>${esc(b.h4)}</h4>`:b.html;
+   if(ed)h+=`<textarea data-note="ed_${k}" aria-label="Fragment ${i+1} ze strony ${pg.page}">${esc(o||src)}</textarea>`;
+   else h+=o?`<div class="mine">${bkWrap(o)}</div>`:bkWrap(src)})});
+ return h+`</div>`}
+window.bkImport=async file=>{if(!sbUser){bookMsg="Najpierw zaloguj się w sekcji Synchronizacja.";render();return}
+ bookBusy=true;bookMsg="Czytam plik…";render();
+ try{const P=JSON.parse(await file.text());if(!P.bio61book||!P.topics)throw new Error("To nie jest paczka z materiałami.");
+  const names=Object.keys(P.images||{});let n=0;
+  for(const nm of names){const blob=await (await fetch(P.images[nm])).blob();
+   const {error}=await sb.storage.from("photos").upload(sbUser.id+"/book/"+nm,blob,{contentType:"image/jpeg",upsert:true});if(error)throw new Error("Zdjęcie "+nm+": "+error.message);
+   await idbPut("bk:img:"+nm,blob);n++;if(n%10===0){bookMsg=`Wysyłam rysunki: ${n}/${names.length}…`;const el=document.getElementById("bookst");if(el)el.textContent=bookMsg}}
+  const rows=Object.entries(P.topics).map(([id,data])=>({user_id:sbUser.id,id,data,updated_at:new Date().toISOString()}));
+  const {error}=await sb.from("book").upsert(rows);if(error)throw new Error(error.message);
+  for(const r of rows)BOOK[r.id]=r.data;await idbPut("bk:data:"+sbUser.id,BOOK);
+  bookMsg=`Gotowe: ${rows.length} tematów, ${names.length} rysunków. Są teraz na Twoim koncie.`}
+ catch(e){bookMsg="Nie udało się: "+(e.message||e)}
+ bookBusy=false;render()};
+function bookPanel(){if(!IS_PWA)return "";const n=Object.keys(BOOK).length;
+ return `<section class="panel"><h3>📖 Materiały z podręcznika</h3><p class="small muted" style="margin-top:4px">Przepisane strony vademecum i rysunki. Są zapisane tylko na Twoim koncie – bez zalogowania nikt ich nie zobaczy, nie ma ich w kodzie na GitHubie.</p>
+ ${sbUser?`<p class="small" style="margin-top:6px">${n?`Na koncie: ${n} tematów.`:"Na koncie nie ma jeszcze materiałów."}</p><label class="btn block${n?" ghost":""}" style="margin-top:10px">${bookBusy?"Wczytuję…":"Wczytaj paczkę z materiałami"}<input type="file" accept="application/json,.json" data-book="1" style="display:none"${bookBusy?" disabled":""}></label>`:`<p class="small" style="margin-top:6px">Zaloguj się, żeby je zobaczyć lub wczytać.</p>`}
+ <p class="small muted" id="bookst" style="margin-top:6px">${esc(bookMsg)}</p></section>`}
 function sbPanel(){if(sbUser)return `<section class="panel"><h3>☁️ Synchronizacja włączona</h3><p class="small muted" style="margin-top:4px">Konto: <b>${esc(sbUser.email||"")}</b>. Postępy, notatki, edycje zadań i zdjęcia zapisują się w chmurze i są takie same na każdym urządzeniu, na którym się zalogujesz.</p>${saveErr?`<p class="small" style="color:var(--bad);margin-top:6px">Ostatni zapis nie doszedł (${esc(saveErr)}). Spróbuję ponownie przy kolejnej zmianie.</p>`:""}<button class="btn block ghost" style="margin-top:10px" data-on="sbOut()">Wyloguj</button></section>`;
  return `<section class="panel"><h3>☁️ Synchronizacja</h3><p class="small muted" style="margin-top:4px">Zaloguj się, żeby notatki, postępy i zdjęcia były w chmurze – te same na telefonie i komputerze. Obecne dane z tego urządzenia zostaną dołączone do konta.</p>
  <input id="sbe" type="email" autocomplete="email" placeholder="e-mail" style="width:100%;margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:12px;font:inherit;background:var(--bg);color:var(--ink)">
@@ -624,7 +682,8 @@ const errCount=()=>quizWrong().length+errTasks().length;
 
 /* ---------- ryciny ---------- */
 const pageSrc=n=>"img/s"+String(n).padStart(2,"0")+".jpg";
-const capOf=src=>{for(const t in FIGS)for(const x of FIGS[t])if("img/"+x[0]===src)return x[1]+" · vademecum s. "+x[2];const m=src.match(/s(\d+)\.jpg$/);return m?"Vademecum, s. "+Number(m[1]):""};
+const BKCAP={};
+const capOf=src=>{if(BKCAP[src])return BKCAP[src];for(const t in FIGS)for(const x of FIGS[t])if("img/"+x[0]===src)return x[1]+" · vademecum s. "+x[2];const m=src.match(/s(\d+)\.jpg$/);return m?"Vademecum, s. "+Number(m[1]):""};
 window.openImg=src=>{$("#lbi").src=src;$("#lbc").textContent=capOf(src);$("#lb").classList.add("on");$("#lb").classList.remove("zoom");document.body.style.overflow="hidden"};
 window.closeImg=()=>{$("#lb").classList.remove("on");$("#lbi").removeAttribute("src");document.body.style.overflow=""};
 window.zoomImg=()=>$("#lb").classList.toggle("zoom");
@@ -680,14 +739,17 @@ function vTematy(){
  return h+arkList()+`</div>`}
 
 function vTemat(tid,tab){
- const t=TEMATY.find(x=>x.id===tid);if(!t)return vTematy();tab=tab||"notatka";
+ const t=TEMATY.find(x=>x.id===tid);if(!t)return vTematy();tab=tab||(BOOK[tid]?"podrecznik":"notatka");
  if(!S.read[tid]){S.read[tid]=true;save()}
- const tabs=[["notatka","Notatka"],["fiszki","Fiszki"],["quiz","Quiz"],["tabele","Tabele"],["ryciny","Ryciny"],["zadania","Zadania"]];
+ const tabs=[...(BOOK[tid]||(IS_PWA&&sbUser)?[["podrecznik","Podręcznik"]]:[]),["notatka","Notatka"],["fiszki","Fiszki"],["quiz","Quiz"],["tabele","Tabele"],["ryciny","Ryciny"],["zadania","Zadania"]];
  let h=`<button class="back" data-on="location.hash='tematy'">‹ Tematy</button>
  <div class="row between" style="margin:2px 0 12px"><div style="flex:1;min-width:0"><p class="small muted">${esc((DZIALY.find(d=>d.id===t.dzial)||{}).name||"")}</p><h2>${esc(t.name)}</h2></div>${ring(mastery(tid))}</div>
  ${sess&&!sess.done&&!sess.empty?`<a class="btn block" href="#sesja" style="margin-bottom:12px">Wróć do sesji (${sess.i}/${sess.items.length}) ▸</a>`:""}
  ${vidPanel(tid,t.dzial)}<div style="height:12px"></div>
  <div class="tabs2" role="group" aria-label="Części tematu">${tabs.map(([k,l])=>`<button aria-pressed="${k===tab}" data-on="location.hash='t/${tid}/${k}'">${l}</button>`).join("")}</div><div class="stack" style="margin-top:14px">`;
+ if(tab==="podrecznik"){const ed=edOpen==="bk_"+tid;
+  h+=BOOK[tid]?`<p class="small muted">Tekst przepisany z vademecum 1:1. Widać go tylko po zalogowaniu na Twoje konto.</p><button class="chip" data-on="toggleEd('bk_${tid}')">${ed?"Gotowe":"✏️ Edytuj"}</button>${ed?`<p class="small muted">Fragmenty są w HTML (np. &lt;b&gt;pogrubienie&lt;/b&gt;). Wyczyść pole, żeby wrócić do oryginału.</p>`:""}${bookH(tid,ed)}`
+   :`<p class="small muted">Dla tego tematu nie ma jeszcze przepisanych stron. Wczytasz je w zakładce Postępy → Materiały z podręcznika.</p>`}
  if(tab==="notatka"){const figs=(FIGS[tid]||[]).slice(),used=new Set();
   h+=`<p class="small muted">Streszczenie vademecum Nowej Ery. Stuknij nagłówek, żeby zwinąć sekcję. Gdy coś się nie zgadza z książką – ufaj książce.</p><div>`;
   t.note.forEach(([a,b,k],i)=>{const pg=(k.match(/^v(\d+)$/)||[])[1];let fh="";
@@ -703,7 +765,8 @@ function vTemat(tid,tab){
  if(tab==="tabele"){const T=TABELE[tid]||[];
   h+=`<p class="small muted">Tabele hasłowe: najważniejsze pojęcia z vademecum w skrócie, z numerem strony. Pełną treść masz w książce i w zakładce Ryciny.</p>`;
   h+=T.map(tb=>`<section class="panel ktab"><h3>${esc(tb.t)} <span class="small muted">${esc(tb.p)}</span></h3><div style="margin-top:6px">${tb.r.map(r=>`<div class="krow${tb.h.length===2?" one":""}"><div class="k">${esc(r[0])}</div><dl>${r.slice(1).map((c,i)=>tb.h.length===2?`<dd>${esc(c)}</dd>`:`<dt>${esc(tb.h[i+1])}</dt><dd>${esc(c)}</dd>`).join("")}</dl></div>`).join("")}</div></section>`).join("")}
- if(tab==="ryciny"){const f=IS_PWA?[]:(FIGS[tid]||[]);if(IS_PWA)h+=`<p class="small muted">Zdjęcia stron z vademecum są tylko w wersji w Claude (prywatnej) – w aplikacji publicznej nie mogę ich umieszczać. Tu masz numery stron i schematy.</p>`;
+ if(tab==="ryciny"){const f=IS_PWA?[]:(FIGS[tid]||[]);if(IS_PWA){const B=BOOK[tid];if(B){h+=`<div class="bk">`;B.pages.forEach((pg,pi)=>pg.blocks.forEach((b,i)=>{if(b.img&&!noteTxt("hid_bk_"+tid+"_"+pi+"_"+i))h+=bkFig(b,(b.cap?b.cap+" · ":"")+"s. "+pg.page)}));h+=`</div>`}
+  else h+=`<p class="small muted">Rysunki z vademecum zobaczysz po zalogowaniu i wczytaniu materiałów (Postępy → Materiały z podręcznika).</p>`}
   h+=f.length?`<div class="figs">${f.map(figH).join("")}</div>`:"";
   if(SCHEMAT[tid])h+=`<h3>Schemat do przerysowania z pamięci</h3><div class="svgwrap">${SCHEMAT[tid]}</div>`;
   h+=`<h3>Całe strony vademecum</h3>${pagesH(PAGES[tid]||[])}<p class="small muted">Zdjęcia z Twojej książki – tylko do nauki, nie udostępniaj tej strony publicznie.</p>`}
@@ -790,6 +853,7 @@ function phGrid(id){const ph=S.photos[id]||[];
 let delPend=null,assetsNS;
 async function getAssets(){if(assetsNS!==undefined)return assetsNS;try{assetsNS=window.claude&&window.claude.use?await window.claude.use("assets"):null}catch(e){assetsNS=null}return assetsNS}
 async function shrink(file){const bmp=await createImageBitmap(file);const sc=Math.min(1,1800/Math.max(bmp.width,bmp.height));const c=document.createElement("canvas");c.width=Math.round(bmp.width*sc);c.height=Math.round(bmp.height*sc);c.getContext("2d").drawImage(bmp,0,0,c.width,c.height);return await new Promise(r=>c.toBlob(r,"image/jpeg",0.82))}
+document.addEventListener("change",e=>{const el=e.target.closest("[data-book]");if(el&&el.files&&el.files[0])bkImport(el.files[0])});
 document.addEventListener("change",async e=>{const el=e.target.closest("[data-photo]");if(!el||!el.files||!el.files[0])return;const id=el.getAttribute("data-photo"),st=document.getElementById("pst-"+id);
  if(IS_PWA){try{if(st)st.textContent="Zapisuję zdjęcie…";const blob=await shrink(el.files[0]);const k="idb:"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);await idbPut(k,blob);PH[k]=URL.createObjectURL(blob);const np={a:k,u:"",at:Date.now()};(S.photos[id]=S.photos[id]||[]).push(np);save();render();sbPhoto(np).catch(()=>{})}catch(err){if(st)st.textContent="Nie udało się zapisać zdjęcia."}return}
  const as=await getAssets();if(!as){if(st)st.textContent="Zdjęcia można dodawać po otwarciu aplikacji na swoim koncie Claude.";return}
@@ -826,7 +890,7 @@ function vPostepy(){
  <section class="panel"><h3>Tematy</h3>`;
  for(const t of readyT()){const m=mastery(t.id);h+=`<a href="#t/${t.id}/notatka" style="display:block;text-decoration:none;color:inherit;padding:10px 0;border-top:1px solid var(--line)"><div class="row between"><span>${esc(t.name)}</span><b>${Math.round(m*100)}%</b></div><div class="meter" style="margin-top:6px"><i style="width:${m*100}%"></i></div></a>`}
  h+=`</section>`;
- h+=sbPanel();
+ h+=sbPanel()+bookPanel();
  if(IS_PWA){let le=0;try{le=Number(localStorage.getItem("bio61exp"))||0}catch(e){}const ago=le?Math.floor((Date.now()-le)/864e5):null;
   h+=`<section class="panel"><h3>Kopia zapasowa</h3><p class="small muted" style="margin-top:4px">${sbUser?"Dane są w chmurze, ale kopia w pliku nie zaszkodzi.":"Bez logowania wszystko (postępy, notatki, zdjęcia, własne zadania) jest zapisane tylko na tym urządzeniu. Rób kopię co tydzień i trzymaj ją np. na Dysku Google lub w iCloud."}</p>
   <p class="small" style="margin-top:8px;${ago==null||ago>7?"color:var(--bad);font-weight:700":""}">${ago==null?"Nie masz jeszcze żadnej kopii.":"Ostatnia kopia: "+(ago===0?"dziś":ago+" dni temu")+"."}</p>
