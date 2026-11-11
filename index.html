@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F3F1EA">
+<script>try{const t=localStorage.getItem("bio61theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
 <title>Bio 61</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -430,6 +431,11 @@ window.bkImport=async file=>{if(!sbUser){bookMsg="Najpierw zaloguj się w sekcji
   bookMsg=`Gotowe: ${rows.length} tematów, ${names.length} rysunków. Są teraz na Twoim koncie.`}
  catch(e){bookMsg="Nie udało się: "+(e.message||e)}
  bookBusy=false;render()};
+function setTheme(t){try{t?localStorage.setItem("bio61theme",t):localStorage.removeItem("bio61theme")}catch(e){}if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme;themeColor();render()}
+function themeColor(){const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=getComputedStyle(document.documentElement).getPropertyValue("--bg").trim()}
+themeColor();matchMedia("(prefers-color-scheme:dark)").addEventListener("change",themeColor);
+function themePanel(){const t=document.documentElement.dataset.theme||"";
+ return `<section class="panel"><h3>🌓 Wygląd</h3><div class="seg" role="group" aria-label="Motyw" style="margin-top:10px">${[["","Auto"],["light","Jasny"],["dark","Ciemny"]].map(([v,l])=>`<button aria-pressed="${v===t}" data-on="setTheme('${v}')">${l}</button>`).join("")}</div><p class="small muted" style="margin-top:6px">Auto dopasowuje się do ustawień telefonu.</p></section>`}
 function bookPanel(){if(!IS_PWA)return "";const n=Object.keys(BOOK).length;
  return `<section class="panel"><h3>📖 Materiały z podręcznika</h3><p class="small muted" style="margin-top:4px">Przepisane strony vademecum i rysunki. Są zapisane tylko na Twoim koncie – bez zalogowania nikt ich nie zobaczy, nie ma ich w kodzie na GitHubie.</p>
  ${sbUser?`<p class="small" style="margin-top:6px">${n?`Na koncie: ${n} tematów.`:"Na koncie nie ma jeszcze materiałów."}</p><label class="btn block${n?" ghost":""}" style="margin-top:10px">${bookBusy?"Wczytuję…":"Wczytaj paczkę z materiałami"}<input type="file" accept="application/json,.json" data-book="1" style="display:none"${bookBusy?" disabled":""}></label>`:`<p class="small" style="margin-top:6px">Zaloguj się, żeby je zobaczyć lub wczytać.</p>`}
@@ -683,7 +689,7 @@ function vPostepy(){
  <section class="panel"><h3>Tematy</h3>`;
  for(const t of readyT()){const m=mastery(t.id);h+=`<a href="#t/${t.id}/podrecznik" style="display:block;text-decoration:none;color:inherit;padding:10px 0;border-top:1px solid var(--line)"><div class="row between"><span>${esc(t.name)}</span><b>${Math.round(m*100)}%</b></div><div class="meter" style="margin-top:6px"><i style="width:${m*100}%"></i></div></a>`}
  h+=`</section>`;
- h+=sbPanel()+bookPanel();
+ h+=sbPanel()+bookPanel()+themePanel();
  if(IS_PWA){let le=0;try{le=Number(localStorage.getItem("bio61exp"))||0}catch(e){}const ago=le?Math.floor((Date.now()-le)/864e5):null;
   h+=`<section class="panel"><h3>Kopia zapasowa</h3><p class="small muted" style="margin-top:4px">${sbUser?"Dane są w chmurze, ale kopia w pliku nie zaszkodzi.":"Bez logowania wszystko (postępy, notatki, zdjęcia, własne zadania) jest zapisane tylko na tym urządzeniu. Rób kopię co tydzień i trzymaj ją np. na Dysku Google lub w iCloud."}</p>
   <p class="small" style="margin-top:8px;${ago==null||ago>7?"color:var(--bad);font-weight:700":""}">${ago==null?"Nie masz jeszcze żadnej kopii.":"Ostatnia kopia: "+(ago===0?"dziś":ago+" dni temu")+"."}</p>
