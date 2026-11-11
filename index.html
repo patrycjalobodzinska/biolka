@@ -663,7 +663,7 @@ function vDzis(){
  <div class="kpis"><div class="kpi"><b>${lg.n}</b><span>odpowiedzi dziś</span></div><div class="kpi"><b>${lg.n?Math.round(lg.ok/lg.n*100)+"%":"–"}</b><span>trafność dziś</span></div><div class="kpi"><b>${Math.round(overall()*100)}%</b><span>materiału opanowane</span></div></div>
  <section class="panel"><p class="small muted">Plan na dziś</p><p style="margin-top:4px">${hint}</p></section>
  ${nt?`<a class="tcard" href="#t/${nt.id}/notatka"><div class="ring" style="--p:0"><span>nowy</span></div><div class="tx"><p class="small muted">Następny temat – przeczytaj przed sesją</p><h3>${esc(nt.name)}</h3></div><span aria-hidden="true">›</span></a>`:""}
- <p class="status muted">${mode==="konto"?(saveErr?"Nie udało się zapisać na koncie. Postępy są w tej przeglądarce.":"Postępy zapisują się na Twoim koncie."):(IS_PWA?"Dane zapisują się na tym telefonie. Kopię zrobisz w zakładce Postępy.":"Postępy zapisują się w tej przeglądarce.")}</p></div>`}
+ <p class="status muted">${mode==="konto"?(saveErr?"Nie udało się zapisać na koncie. Postępy są w tej przeglądarce.":"Postępy zapisują się na Twoim koncie."):(IS_PWA?"Dane zapisują się na tym telefonie.":"Postępy zapisują się w tej przeglądarce.")+(sb?' <a href="#postepy" style="color:var(--accent);font-weight:600">☁️ Zaloguj się, żeby synchronizować ›</a>':" Kopię zrobisz w zakładce Postępy.")}</p></div>`}
 
 function overall(){const t=readyT();return t.length?t.reduce((s,x)=>s+mastery(x.id),0)/t.length:0}
 function ring(p,label){return `<div class="ring" style="--p:${Math.round(p*100)}"><span>${label!=null?label:Math.round(p*100)+"%"}</span></div>`}
