@@ -741,7 +741,7 @@ function vTematy(){
 function vTemat(tid,tab){
  const t=TEMATY.find(x=>x.id===tid);if(!t)return vTematy();tab=tab||(BOOK[tid]?"podrecznik":"notatka");
  if(!S.read[tid]){S.read[tid]=true;save()}
- const tabs=[...(BOOK[tid]||(IS_PWA&&sbUser)?[["podrecznik","Podręcznik"]]:[]),["notatka","Notatka"],["fiszki","Fiszki"],["quiz","Quiz"],["tabele","Tabele"],["ryciny","Ryciny"],["zadania","Zadania"]];
+ const tabs=[...(BOOK[tid]||(IS_PWA&&sbUser)?[["podrecznik","Podręcznik"]]:[]),["notatka","Streszczenie"],["fiszki","Fiszki"],["quiz","Quiz"],["tabele","Ściąga"],["ryciny","Ryciny"],["zadania","Zadania"]];
  let h=`<button class="back" data-on="location.hash='tematy'">‹ Tematy</button>
  <div class="row between" style="margin:2px 0 12px"><div style="flex:1;min-width:0"><p class="small muted">${esc((DZIALY.find(d=>d.id===t.dzial)||{}).name||"")}</p><h2>${esc(t.name)}</h2></div>${ring(mastery(tid))}</div>
  ${sess&&!sess.done&&!sess.empty?`<a class="btn block" href="#sesja" style="margin-bottom:12px">Wróć do sesji (${sess.i}/${sess.items.length}) ▸</a>`:""}
@@ -751,7 +751,7 @@ function vTemat(tid,tab){
   h+=BOOK[tid]?`<p class="small muted">Tekst przepisany z vademecum 1:1. Widać go tylko po zalogowaniu na Twoje konto.</p><button class="chip" data-on="toggleEd('bk_${tid}')">${ed?"Gotowe":"✏️ Edytuj"}</button>${ed?`<p class="small muted">Fragmenty są w HTML (np. &lt;b&gt;pogrubienie&lt;/b&gt;). Wyczyść pole, żeby wrócić do oryginału.</p>`:""}${bookH(tid,ed)}`
    :`<p class="small muted">Dla tego tematu nie ma jeszcze przepisanych stron. Wczytasz je w zakładce Postępy → Materiały z podręcznika.</p>`}
  if(tab==="notatka"){const figs=(FIGS[tid]||[]).slice(),used=new Set();
-  h+=`<p class="small muted">Streszczenie vademecum Nowej Ery. Stuknij nagłówek, żeby zwinąć sekcję. Gdy coś się nie zgadza z książką – ufaj książce.</p><div>`;
+  h+=`<p class="small muted">Streszczenie vademecum Nowej Ery (skrót, nie tekst z książki – pełny tekst jest w zakładce Podręcznik). Stuknij nagłówek, żeby zwinąć sekcję. Gdy coś się nie zgadza z książką – ufaj książce.</p><div>`;
   t.note.forEach(([a,b,k],i)=>{const pg=(k.match(/^v(\d+)$/)||[])[1];let fh="";
    if(pg)figs.forEach((x,j)=>{if(!used.has(j)&&String(x[2])===pg){used.add(j);fh+=figH(x)}});
    const nk="nt_"+tid+"_"+i,nv=noteTxt(nk),ne=edOpen===nk;
@@ -763,7 +763,7 @@ function vTemat(tid,tab){
  if(tab==="fiszki"){const cs=cardsOf(tid);
   h+=`<button class="btn block big" data-on="startFc('${tid}')">Ćwicz tylko fiszki (${cs.length}) ▸</button><p class="small muted">Stuknij pytanie, żeby zobaczyć odpowiedź. Kropka: zielona – umiesz, żółta – w trakcie, szara – nowa.</p><div>`+cs.map(c=>{const r=S.cards[c.id],col=r?(r.box>=2?"var(--ok)":"var(--gold)"):"var(--line)";return `<details class="ncard"><summary><span style="display:flex;gap:10px;align-items:flex-start"><i style="width:10px;height:10px;border-radius:50%;background:${col};flex:none;margin-top:7px"></i><span>${esc(c.q)}</span></span></summary><div class="bd"><p style="font-family:var(--serif);font-size:1.05rem">${esc(c.a)}</p>${srcH(c.s)}</div></details>`}).join("")+`</div>`}
  if(tab==="tabele"){const T=TABELE[tid]||[];
-  h+=`<p class="small muted">Tabele hasłowe: najważniejsze pojęcia z vademecum w skrócie, z numerem strony. Pełną treść masz w książce i w zakładce Ryciny.</p>`;
+  h+=`<p class="small muted">Ściąga: najważniejsze pojęcia w skrócie (to nie jest tekst z książki). Pełne tabele 1:1 są w zakładce Podręcznik.</p>`;
   h+=T.map(tb=>`<section class="panel ktab"><h3>${esc(tb.t)} <span class="small muted">${esc(tb.p)}</span></h3><div style="margin-top:6px">${tb.r.map(r=>`<div class="krow${tb.h.length===2?" one":""}"><div class="k">${esc(r[0])}</div><dl>${r.slice(1).map((c,i)=>tb.h.length===2?`<dd>${esc(c)}</dd>`:`<dt>${esc(tb.h[i+1])}</dt><dd>${esc(c)}</dd>`).join("")}</dl></div>`).join("")}</div></section>`).join("")}
  if(tab==="ryciny"){const f=IS_PWA?[]:(FIGS[tid]||[]);if(IS_PWA){const B=BOOK[tid];if(B){h+=`<div class="bk">`;B.pages.forEach((pg,pi)=>pg.blocks.forEach((b,i)=>{if(b.img&&!noteTxt("hid_bk_"+tid+"_"+pi+"_"+i))h+=bkFig(b,(b.cap?b.cap+" · ":"")+"s. "+pg.page)}));h+=`</div>`}
   else h+=`<p class="small muted">Rysunki z vademecum zobaczysz po zalogowaniu i wczytaniu materiałów (Postępy → Materiały z podręcznika).</p>`}
