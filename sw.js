@@ -1,4 +1,4 @@
-const V="bio61-v12",OFF="bio61-off";const CORE=["./","index.html","cke/data.js","manifest.webmanifest","icon-192.png","icon-512.png","https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"];
+const V="bio61-v13",OFF="bio61-off";const CORE=["./","index.html","cke/data.js","manifest.webmanifest","icon-192.png","icon-512.png","https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()))});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==V&&k!==OFF).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 /* strona i dane: najpierw sieć (świeża wersja po pushu), offline z cache; obrazki: najpierw cache (też pobrane działy z bio61-off) */

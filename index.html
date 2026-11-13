@@ -610,7 +610,9 @@ function vZad(id){
  h+=myBox(id);
  const r=S.tasks[id];if(r)h+=`<p class="muted small">Ostatni wynik: ${r.score}/${z.max} pkt.</p>`;
  return h+`</div>`}
-function backFor(z){return z.topic?`t/${z.topic}/zadania`:`dz/${dzOf(z)}`}
+/* skąd weszła do zadania (temat, dział, arkusz, Błędy) – tam wraca „Wróć”, z tym samym miejscem na liście */
+let zFrom="";const SCR={};
+function backFor(z){return zFrom||(z.topic?`t/${z.topic}/zadania`:`dz/${dzOf(z)}`)}
 const unH=h=>String(h).replace(/<[^>]+>/g,"").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&");
 const ckImg=(b,mw)=>`<figure class="ckf" data-on="openImg('${b.img}')"><img loading="lazy" src="${b.img}" width="${b.w}" height="${b.h}" style="max-width:${Math.round(b.w/(mw||1.7))}px" alt="Rysunek z arkusza CKE"></figure>`;
 function ckBlocks(bs,key,ed){return (bs||[]).map((b,i)=>{const k=key+i,o=noteTxt("ed_"+k),hid=noteTxt("hid_"+k);
@@ -908,7 +910,9 @@ function render(){
  document.querySelectorAll("nav.tabs a").forEach(a=>{if(a.dataset.v===v)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
  const e=errCount();$("#bb").innerHTML=e?`<span class="badge">${e}</span>`:"";
 }
-window.addEventListener("hashchange",()=>{closeVid();if(!location.hash.startsWith("#zad/"))rv=null;if(!location.hash.startsWith("#sesja"))window.scrollTo(0,0);render()});
+window.addEventListener("hashchange",e=>{closeVid();const o=decodeURIComponent((new URL(e.oldURL).hash||"#dzis").slice(1)),n=decodeURIComponent((location.hash||"#dzis").slice(1));
+ SCR[o]=window.scrollY;if(n.startsWith("zad/")&&!o.startsWith("zad/"))zFrom=o;if(!n.startsWith("zad/"))rv=null;render();
+ if(!n.startsWith("sesja"))window.scrollTo(0,o.startsWith("zad/")&&!n.startsWith("zad/")?SCR[n]||0:0)});
 document.addEventListener("click",e=>{const el=e.target.closest("[data-on]");if(!el||el.disabled)return;const c=el.getAttribute("data-on");let m;
  if((m=c.match(/^location\.hash='(.*)'$/))){location.hash=m[1];return}
  if((m=c.match(/^(\w+)\((.*)\)$/))){const args=m[2]?m[2].split(",").map(x=>{x=x.trim();return /^'.*'$/.test(x)?x.slice(1,-1):Number(x)}):[];const f=window[m[1]];if(typeof f==="function")f(...args)}});
